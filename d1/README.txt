@@ -1,5 +1,10 @@
+This is a modification of DXX-Rebirth by the Descent Rangers (Drakona, JinX, and Verran) for competitive play. Readme to come later.
+http://www.descentrangers.com
+
+Original D1X-Rebirth readme:
                          __________
 __________/ D1X-Rebirth /
+
 
 
 http://www.dxx-rebirth.com
