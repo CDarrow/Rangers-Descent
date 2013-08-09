@@ -20,7 +20,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
+ 
 #include "game.h"
 #include "multi.h"
 #include "object.h"
