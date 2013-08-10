@@ -395,7 +395,7 @@ void toggle_cockpit()
 {
 	int new_mode=CM_FULL_SCREEN;
 
-	if (Rear_view || Player_is_dead || Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)		// jinx 01-25-13 spec
+	if (Rear_view || Player_is_dead)		// jinx 01-25-13 spec
 		return;
 
 	switch (PlayerCfg.CockpitMode[1])

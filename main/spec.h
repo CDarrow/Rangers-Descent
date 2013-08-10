@@ -9,7 +9,6 @@
 
 int spec_trigger;
 int in_free;
-int piggy_and_free_switch;
 int piggy_num;
 int last_piggy_num;
 int first_piggy;

@@ -62,7 +62,7 @@ void drop_player_eggs(object *player); // from collide.c
 // jinx 01-25-12 spectator block start
 // ************************************
 
-void make_me_spec()
+void make_me_not_spec()
 {
 	object *obj;
 	obj = &Objects[Players[Player_num].objnum];
@@ -76,7 +76,7 @@ void make_me_spec()
 	HUD_init_message(HM_MULTI, "You are no longer spectating", Players[Player_num].callsign);
 	in_free = 1;
 }
-void make_me_not_spec()
+void make_me_spec()
 {
 	object *obj;
 	obj = &Objects[Players[Player_num].objnum];
@@ -104,7 +104,7 @@ void multi_make_player_spec()
 	obj = &Objects[Players[Player_num].objnum];
 	if ((obj->type != OBJ_PLAYER) && (obj->type != OBJ_CAMERA) && (obj->type != OBJ_GHOST) && (obj->type != OBJ_CAMERA)) return;
 	
-	game_flush_inputs();
+	game_flush_inputs();		// redundancy
 	Cruise_speed = 0;
 	
 	in_free = 1;
@@ -112,44 +112,15 @@ void multi_make_player_spec()
 	
 	if ((Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 	{
-		make_me_spec();
+		make_me_not_spec();
 		type = 0;
-/*		
-		obj->type = OBJ_PLAYER;
-		obj->render_type = RT_POLYOBJ;
-		obj->control_type	= CT_FLYING;
-		obj->movement_type	= MT_PHYSICS;
-		multi_reset_player_object(obj);
-		Players[Player_num].spec_flags &= ~PLAYER_FLAGS_SPECTATING;
-		reset_stats_spec();
-		HUD_init_message(HM_MULTI, "You are no longer spectating", Players[Player_num].callsign);
-		//timeout_frame();
-		type = 0;
-		in_free = 1;
-*/
 	}
 	else if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 	{
-		make_me_not_spec();
+		make_me_spec();
 		type = 1;
-/*
-		obj->type = OBJ_CAMERA;
-		obj->render_type = RT_NONE;
-		obj->control_type	= CT_FLYING;
-		obj->movement_type	= MT_PHYSICS;
-		multi_reset_player_object(obj);
-		Players[Player_num].spec_flags |= PLAYER_FLAGS_SPECTATING;
-		multi_send_position(Players[Player_num].objnum);
-		drop_player_eggs(ConsoleObject);
-		multi_send_player_explode(MULTI_PLAYER_DROP);
-		reset_stats_spec();
-		in_free = 1;
-		piggy_num = Player_num;
-		HUD_init_message(HM_MULTI, "You are now spectating", Players[Player_num].callsign);
-		//do_resume();
-		type = 1;
-*/
 	}
+	game_flush_inputs();		// redundancy
 	
 	if (Game_mode & GM_MULTI_ROBOTS)
 		multi_strip_robots(Player_num);
@@ -158,6 +129,8 @@ void multi_make_player_spec()
 	spec_kill_movement();
 	
 	multi_send_spec_status(type);
+	
+	game_flush_inputs();		// redundancy
 }
 
 void multi_new_bounty_target( int pnum );
@@ -209,7 +182,7 @@ void multi_do_spec_status (char * buf)
 		obj->type = OBJ_CAMERA;
 		obj->render_type = RT_NONE;
 		obj->mtype.phys_info.flags |= PF_TURNROLL;
-		multi_reset_player_object(obj); 
+		//multi_reset_player_object(obj); 
 		Players[pnum].spec_flags |= PLAYER_FLAGS_SPECTATING;
 		HUD_init_message(HM_MULTI, "%s is now spectating", Players[pnum].callsign);
 		if( Game_mode & GM_BOUNTY && pnum == Bounty_target && multi_i_am_master())
@@ -229,7 +202,7 @@ void multi_do_spec_status (char * buf)
 		obj->type = OBJ_PLAYER;
 		obj->render_type = RT_POLYOBJ;
 		obj->mtype.phys_info.flags |= PF_TURNROLL;
-		multi_reset_player_object(obj);
+		//multi_reset_player_object(obj);
 		Players[pnum].spec_flags &= ~PLAYER_FLAGS_SPECTATING;
 		HUD_init_message(HM_MULTI, "%s is no longer spectating", Players[pnum].callsign);
 		
@@ -242,19 +215,22 @@ void multi_do_spec_status (char * buf)
 
 void reset_stats_spec()
 {
- 	game_flush_inputs();
+ 	game_flush_inputs();		// redundancy
+	
 	int i;
 
-		if (Newdemo_state == ND_STATE_RECORDING)
-		{
-			newdemo_record_laser_level(Players[Player_num].laser_level, 0);
-			newdemo_record_player_weapon(0, 0);
-			newdemo_record_player_weapon(1, 0);
-		}
-		Primary_weapon = 0;
-		Secondary_weapon = 0;
-		Player_eggs_dropped = 0;
-		Global_laser_firing_count=0;
+/*
+	if (Newdemo_state == ND_STATE_RECORDING)
+	{
+		newdemo_record_laser_level(Players[Player_num].laser_level, 0);
+		newdemo_record_player_weapon(0, 0);
+		newdemo_record_player_weapon(1, 0);
+	}
+	Primary_weapon = 0;
+	Secondary_weapon = 0;
+	Player_eggs_dropped = 0;
+	Global_laser_firing_count=0;
+*/
 	
 	Players[Player_num].laser_level = 0;
 	for (i=0; i<MAX_PRIMARY_WEAPONS; i++)
@@ -267,25 +243,22 @@ void reset_stats_spec()
 	Players[Player_num].invulnerable_time = 0;
 	Players[Player_num].homing_object_dist = -F1_0; 
 	digi_kill_sound_linked_to_object(Players[Player_num].objnum);
-	game_flush_inputs();
+	
+	game_flush_inputs();		// redundancy
 }
 
 void switch_between_piggy_and_free()
 {
-
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
-	piggy_and_free_switch = 0;
-	if (!in_free)
-	{
-		in_free = 1;
-	}
-	else if (in_free)
-	{
-		in_free = 0;
+	
+	spec_kill_movement();		// redundancy
+	
+	in_free = !in_free;
+	if (in_free)
 		switch_between_piggies();
-	}
+	
 	kill_all_objects_linked_to_player();
-	spec_kill_movement();
+	spec_kill_movement();		// redundancy
 	game_flush_inputs();
 }
 
@@ -294,6 +267,8 @@ void switch_between_piggies()	// still needs work. semi-hack, but at least it's 
 
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
 	if (in_free) return;
+	
+	spec_kill_movement();		// redundancy
 	int new_piggy_num;
 	new_piggy_num = last_piggy_num + 1;
 	
@@ -329,7 +304,7 @@ void switch_between_piggies()	// still needs work. semi-hack, but at least it's 
 	
 	HUD_init_message(HM_MULTI, "now spectating %s", Players[piggy_num].callsign);
 
-	game_flush_inputs();
+	game_flush_inputs();		// redundancy
 	kill_all_objects_linked_to_player();
 }
 
@@ -356,7 +331,6 @@ void make_spectator_ghost_follow_piggy(int pnum)
 
 void spec_kill_movement()
 {
-
 	object * obj;
 	obj = &Objects[Players[Player_num].objnum];
 
@@ -373,7 +347,7 @@ void spec_kill_movement()
 	obj->mtype.phys_info.rotthrust.x	=	0;
 	obj->mtype.phys_info.rotthrust.y	=	0;
 	obj->mtype.phys_info.rotthrust.z	=	0;
-	game_flush_inputs();
+	game_flush_inputs();		// redundancy
 }
 
 void kill_all_objects_linked_to_player()
@@ -440,15 +414,27 @@ void do_spectator_frame()
 	{
 		object *obj;
 		obj = &Objects[Players[Player_num].objnum];
-		if ((obj->render_type != RT_NONE) && (!Player_is_dead))
-			make_me_spec();
+		if ((obj->render_type != RT_NONE) || (obj->type != OBJ_CAMERA))
+		{
+			obj->type = OBJ_PLAYER;
+			obj->render_type = RT_POLYOBJ;
+			obj->control_type	= CT_FLYING;
+			obj->movement_type	= MT_PHYSICS;
+			multi_reset_player_object(obj);
+		}
 	}
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 	{
 		object *obj;
 		obj = &Objects[Players[Player_num].objnum];
-		if ((obj->render_type != RT_POLYOBJ) && (Player_is_dead))
-			make_me_not_spec();
+		if (((obj->render_type != RT_POLYOBJ) || (obj->type != OBJ_PLAYER)) && (!Player_is_dead))
+		{
+			obj->type = OBJ_PLAYER;
+			obj->render_type = RT_POLYOBJ;
+			obj->control_type	= CT_FLYING;
+			obj->movement_type	= MT_PHYSICS;
+			multi_reset_player_object(obj);
+		}
 	}
 
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
