@@ -1259,7 +1259,7 @@ int ReadControls(d_event *event)
 	} else {
 		exploding_flag=0;
 	}
-	if (Player_is_dead && !( (Game_mode & GM_MULTI) && (multi_sending_message[Player_num] || multi_defining_message) ))
+	if ((Player_is_dead || Player_is_unspectating) && !( (Game_mode & GM_MULTI) && (multi_sending_message[Player_num] || multi_defining_message) ))
 		if (HandleDeathInput(event))
 			return 1;
 

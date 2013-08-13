@@ -1,0 +1,5 @@
+bugs
+
+10-12-13:
+leaving piggyback causes the game to crash when you leave the segment you spawn into
+cannot join netgame due to some certain error -- not receiving certain packets or such

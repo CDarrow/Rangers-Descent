@@ -57,48 +57,149 @@
 extern fix Cruise_speed;	// jinx 08-07-spec
 
 void drop_player_eggs(object *player); // from collide.c
+void set_camera_pos(vms_vector *camera_pos, object *objp);
 
 // ************************************
 // jinx 01-25-12 spectator block start
 // ************************************
 
+extern int		Player_is_dead;			//	If !0, then player is dead, but game continues so he can watch.
+extern object	*Dead_player_camera;	//	Object index of object watching deader.
+extern object	*Viewer_save;
+extern int		Player_flags_save;
+extern int		Player_exploded;
+extern int		Death_sequence_aborted;
+extern int		Player_eggs_dropped;
+extern fix		Camera_to_player_dist_goal;
+extern ubyte		Control_type_save, Render_type_save;
+
+void start_player_unspectate_sequence(object *player)
+{
+	int	objnum;
+
+	Assert(player == ConsoleObject);
+		
+	Players[Player_num].spec_flags |= PLAYER_FLAGS_SPECTATING;
+		
+	reset_rear_view();
+	
+	Player_is_dead = 1;
+	Players[Player_num].flags &= ~(PLAYER_FLAGS_AFTERBURNER);
+
+	vm_vec_zero(&player->mtype.phys_info.rotthrust);  //this line commented by WraithX
+	vm_vec_zero(&player->mtype.phys_info.thrust);
+
+	objnum = obj_create(OBJ_CAMERA, 0, player->segnum, &player->pos, &player->orient, 0, CT_NONE, MT_NONE, RT_NONE);
+	Viewer_save = Viewer;
+	if (objnum != -1)
+		Viewer = Dead_player_camera = &Objects[objnum];
+	else {
+		Int3();
+		Dead_player_camera = Viewer;
+	}
+
+	select_cockpit(CM_LETTERBOX);
+	if (Newdemo_state == ND_STATE_RECORDING)
+		newdemo_record_letterbox();
+
+	Player_flags_save = player->flags;
+	Control_type_save = player->control_type;
+	Render_type_save = player->render_type;
+
+//	Players[Player_num].flags |= PLAYER_FLAGS_INVULNERABLE;
+	player->control_type = CT_NONE;
+	player->shields = F1_0*1000;
+
+	PALETTE_FLASH_SET(0,0,0);
+	HUD_init_message(HM_MULTI, "Prepare for Descent!", Players[Player_num].callsign);
+}
+
+void unspectating_player_frame(void)
+{
+
+}
+
+
 void make_me_not_spec()
 {
+	con_printf(CON_VERBOSE, "makemenotspec");
 	object *obj;
 	obj = &Objects[Players[Player_num].objnum];
-	obj->type = OBJ_PLAYER;
+
+	Player_is_unspectating = 1;
+	Players[Player_num].spec_flags |= PLAYER_FLAGS_SPECTATING;
+	start_player_unspectate_sequence(obj);
+	
+/*	obj->type = OBJ_PLAYER;
 	obj->render_type = RT_POLYOBJ;
 	obj->control_type	= CT_FLYING;
 	obj->movement_type	= MT_PHYSICS;
 	multi_reset_player_object(obj);
 	Players[Player_num].spec_flags &= ~PLAYER_FLAGS_SPECTATING;
 	reset_stats_spec();
+
+
+//			if ( killer && (killer->type == OBJ_PLAYER))
+//				Players[Player_num].killer_objnum = killer-Objects;
+
+	Players[Player_num].flags |= OF_SHOULD_BE_DEAD;
+	Players[Player_num].shields = -1;
+	start_player_death_sequence(obj);
 	HUD_init_message(HM_MULTI, "You are no longer spectating", Players[Player_num].callsign);
 	in_free = 1;
+*/
+	//Player_is_dead = 1;
+	Players[Player_num].spec_flags &= ~PLAYER_FLAGS_SPECTATING;
+		
+	/*obj_delete(Dead_player_camera-Objects);
+	Dead_player_camera = NULL;
+	select_cockpit(PlayerCfg.CockpitMode[0]);
+	Viewer = Viewer_save;
+	ConsoleObject->type = OBJ_PLAYER;
+	*/
+	
+	if (Newdemo_state == ND_STATE_RECORDING)
+		newdemo_record_restore_cockpit();
 }
 void make_me_spec()
 {
+	con_printf(CON_VERBOSE, "makemespec");
+	
+	Players[Player_num].spec_flags |= PLAYER_FLAGS_SPECTATING;
+	HUD_init_message(HM_MULTI, "You are now spectating", Players[Player_num].callsign);
+
+	
+	
+		
 	object *obj;
 	obj = &Objects[Players[Player_num].objnum];
+	Players[Player_num].spec_flags |= PLAYER_FLAGS_SPECTATING;
+
+
 	obj->type = OBJ_CAMERA;
 	obj->render_type = RT_NONE;
 	obj->control_type	= CT_FLYING;
 	obj->movement_type	= MT_PHYSICS;
-	multi_reset_player_object(obj);
-	Players[Player_num].spec_flags |= PLAYER_FLAGS_SPECTATING;
-	multi_send_position(Players[Player_num].objnum);
+// 	multi_reset_player_object(obj);
+	
+//	multi_send_position(Players[Player_num].objnum);
 	drop_player_eggs(ConsoleObject);
 	multi_send_player_explode(MULTI_PLAYER_DROP);
 	reset_stats_spec();
 	in_free = 1;
 	piggy_num = Player_num;
+	select_cockpit(CM_LETTERBOX);
+	if (Newdemo_state == ND_STATE_RECORDING)
+		newdemo_record_letterbox();
 	HUD_init_message(HM_MULTI, "You are now spectating", Players[Player_num].callsign);
+
 }
 
 void multi_make_player_spec()
 {
+	con_printf(CON_VERBOSE, "multimakeplayerspec");
 	if (!spec) return;
-
+	
 	int type;
 	object *obj;
 	obj = &Objects[Players[Player_num].objnum];
@@ -137,7 +238,7 @@ void multi_new_bounty_target( int pnum );
 
 void multi_send_spec_flags (char pnum)
 {
-
+	con_printf(CON_VERBOSE, "multisendspecflags");
 	multibuf[0]=MULTI_SPEC_FLAGS;
 	multibuf[1]=pnum;
 	PUT_INTEL_INT(multibuf+2, Players[(int)pnum].spec_flags);
@@ -148,7 +249,7 @@ void multi_send_spec_flags (char pnum)
 
 void multi_send_spec_status (int type)
 {
-
+	con_printf(CON_VERBOSE, "multisendspecstatus");
 	multibuf[0]=MULTI_DO_SPEC_STATUS;
 	multibuf[1]=Player_num;
 	multibuf[2]=type;
@@ -158,6 +259,7 @@ void multi_send_spec_status (int type)
 
 void multi_do_spec_flags (char * buf)
 {
+	con_printf(CON_VERBOSE, "multidospecflags");
 	int pnum=buf[1];
 	uint spec_flags;
 
@@ -169,7 +271,7 @@ void multi_do_spec_flags (char * buf)
 
 void multi_do_spec_status (char * buf)
 {
-
+	con_printf(CON_VERBOSE, "multidospecstatus");
 	object *obj;
 	
 	int pnum = buf[1];
@@ -215,6 +317,7 @@ void multi_do_spec_status (char * buf)
 
 void reset_stats_spec()
 {
+	con_printf(CON_VERBOSE, "resetstatsspec");
  	game_flush_inputs();		// redundancy
 	
 	int i;
@@ -249,6 +352,7 @@ void reset_stats_spec()
 
 void switch_between_piggy_and_free()
 {
+	con_printf(CON_VERBOSE, "switchbetweenpiggyandfree");
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
 	
 	spec_kill_movement();		// redundancy
@@ -256,6 +360,12 @@ void switch_between_piggy_and_free()
 	in_free = !in_free;
 	if (in_free)
 		switch_between_piggies();
+	if (!in_free)
+	{
+		multi_make_player_spec();
+		multi_make_player_spec();
+		in_free = 0;
+	}
 	
 	kill_all_objects_linked_to_player();
 	spec_kill_movement();		// redundancy
@@ -264,7 +374,7 @@ void switch_between_piggy_and_free()
 
 void switch_between_piggies()	// still needs work. semi-hack, but at least it's doing what it's supposed to
 {
-
+	con_printf(CON_VERBOSE, "switchbetweenpiggies");
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
 	if (in_free) return;
 	
@@ -310,7 +420,7 @@ void switch_between_piggies()	// still needs work. semi-hack, but at least it's 
 
 void render_spec_status()
 {
-
+	con_printf(CON_VERBOSE, "renderspecstatus");
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
 	if (!display_spec_text) return;
 	
@@ -324,6 +434,12 @@ void render_spec_status()
 
 void make_spectator_ghost_follow_piggy(int pnum)
 {
+	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
+	if (in_free) return;
+	con_printf(CON_VERBOSE, "makespectatorghostfollowpiggy");
+	Objects[Players[Player_num].objnum].last_pos.x = Objects[Players[piggy_num].objnum].last_pos.x;
+	Objects[Players[Player_num].objnum].last_pos.y = Objects[Players[piggy_num].objnum].last_pos.y;
+	Objects[Players[Player_num].objnum].last_pos.z = Objects[Players[piggy_num].objnum].last_pos.z;
 	Objects[Players[Player_num].objnum].pos =  Objects[Players[piggy_num].objnum].pos;
 	Objects[Players[Player_num].objnum].orient =  Objects[Players[piggy_num].objnum].orient;
 	Objects[Players[Player_num].objnum].segnum =  Objects[Players[piggy_num].objnum].segnum;
@@ -331,6 +447,8 @@ void make_spectator_ghost_follow_piggy(int pnum)
 
 void spec_kill_movement()
 {
+	con_printf(CON_VERBOSE, "speckillmovement");
+	return;
 	object * obj;
 	obj = &Objects[Players[Player_num].objnum];
 
@@ -352,6 +470,7 @@ void spec_kill_movement()
 
 void kill_all_objects_linked_to_player()
 {
+	con_printf(CON_VERBOSE, "killallobjectslinkedtoplayer");
 	return;
 
 	int i;
@@ -369,7 +488,8 @@ void kill_all_objects_linked_to_player()
 
 void calculate_rotation_interpolation(vms_matrix original_orient, object *plobj)
 {
-
+	con_printf(CON_VERBOSE, "calculaterotationinterpolation");
+	return;
 	// interpolate all data between two packets to smooth out player's rotation (but only if the viewer is spectating to prevent affecting the actual gameplay)
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 		return;
@@ -393,7 +513,8 @@ void calculate_rotation_interpolation(vms_matrix original_orient, object *plobj)
 
 void do_rotation_interpolation(object *spobj)
 {
-
+	con_printf(CON_VERBOSE, "dorotationinterpolation");
+	return;
 	// apply the new matrix every frame
 	spobj->orient.rvec.x += orient_interpolation_matrix.rvec.x / 1.3;
 	spobj->orient.rvec.y += orient_interpolation_matrix.rvec.y / 1.3;
@@ -410,8 +531,11 @@ extern fix Cruise_speed;	// jinx 08-07-spec
 
 void do_spectator_frame()
 {
+	con_printf(CON_VERBOSE, "dospectatorframe");
+	/*
 	if ((Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 	{
+		con_printf(CON_VERBOSE, "1a");
 		object *obj;
 		obj = &Objects[Players[Player_num].objnum];
 		if ((obj->render_type != RT_NONE) || (obj->type != OBJ_CAMERA))
@@ -425,6 +549,7 @@ void do_spectator_frame()
 	}
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 	{
+		con_printf(CON_VERBOSE, "1b");
 		object *obj;
 		obj = &Objects[Players[Player_num].objnum];
 		if (((obj->render_type != RT_POLYOBJ) || (obj->type != OBJ_PLAYER)) && (!Player_is_dead))
@@ -436,13 +561,19 @@ void do_spectator_frame()
 			multi_reset_player_object(obj);
 		}
 	}
+	*/
+	unspectating_player_frame();
+	con_printf(CON_VERBOSE, "2");
 
+	
 	if (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING)) return;
 	if (!in_free) 
 	{
+		con_printf(CON_VERBOSE, "3");
 		make_spectator_ghost_follow_piggy(piggy_num);			
 		//do_rotation_interpolation(&Objects[Players[piggy_num].objnum]);
 		if ((Players[piggy_num].connected != CONNECT_PLAYING) || (Players[piggy_num].spec_flags & PLAYER_FLAGS_SPECTATING))
 			switch_between_piggies();
+		con_printf(CON_VERBOSE, "4");
 	}
 }

@@ -1381,6 +1381,13 @@ void dead_player_frame(void)
 
 	if (Player_is_dead)
         {
+		if (Player_is_unspectating)
+		{
+			Player_eggs_dropped = 1;
+			Player_exploded = 1;
+			Death_sequence_aborted = 1;
+		}
+			
 		time_dead += FrameTime;
 
 		//	If unable to create camera at time of death, create now.
@@ -1426,47 +1433,54 @@ void dead_player_frame(void)
 		}
 		//end addition by WX
 
-		if (time_dead > DEATH_SEQUENCE_EXPLODE_TIME) {
-			if (!Player_exploded) {
+			if (time_dead > DEATH_SEQUENCE_EXPLODE_TIME) 
+			{
+				if (!Player_exploded) {
 
-			if (Players[Player_num].hostages_on_board > 1)
-				HUD_init_message(HM_DEFAULT, TXT_SHIP_DESTROYED_2, Players[Player_num].hostages_on_board);
-			else if (Players[Player_num].hostages_on_board == 1)
-				HUD_init_message(HM_DEFAULT, TXT_SHIP_DESTROYED_1);
-			else
-				HUD_init_message(HM_DEFAULT, TXT_SHIP_DESTROYED_0);
+				if (Players[Player_num].hostages_on_board > 1)
+					HUD_init_message(HM_DEFAULT, TXT_SHIP_DESTROYED_2, Players[Player_num].hostages_on_board);
+				else if (Players[Player_num].hostages_on_board == 1)
+					HUD_init_message(HM_DEFAULT, TXT_SHIP_DESTROYED_1);
+				else
+					HUD_init_message(HM_DEFAULT, TXT_SHIP_DESTROYED_0);
 
-				Player_exploded = 1;
-#ifdef NETWORK
-				if (Game_mode & GM_NETWORK)
-					multi_powcap_cap_objects();
-#endif
-				drop_player_eggs(ConsoleObject);
-				Player_eggs_dropped = 1;
-#ifdef NETWORK
-				if (Game_mode & GM_MULTI)
-				{
-					multi_send_player_explode(MULTI_PLAYER_EXPLODE);
+					Player_exploded = 1;
+					if (!(Players[Player_num].flags & PLAYER_FLAGS_SPECTATING))
+					{
+		#ifdef NETWORK
+						if (Game_mode & GM_NETWORK)
+							multi_powcap_cap_objects();
+		#endif
+						drop_player_eggs(ConsoleObject);
+						Player_eggs_dropped = 1;
+		#ifdef NETWORK
+						if (Game_mode & GM_MULTI)
+						{
+							multi_send_player_explode(MULTI_PLAYER_EXPLODE);
+						}
+		#endif
+
+						explode_badass_player(ConsoleObject);
+
+					//is this next line needed, given the badass call above?
+						explode_object(ConsoleObject,0);
+					}
+					else
+						Player_eggs_dropped = 1;
+					ConsoleObject->flags &= ~OF_SHOULD_BE_DEAD;		//don't really kill player
+					ConsoleObject->render_type = RT_NONE;				//..just make him disappear
+					ConsoleObject->type = OBJ_GHOST;						//..and kill intersections
 				}
-#endif
-
-				explode_badass_player(ConsoleObject);
-
-				//is this next line needed, given the badass call above?
-				explode_object(ConsoleObject,0);
-				ConsoleObject->flags &= ~OF_SHOULD_BE_DEAD;		//don't really kill player
-				ConsoleObject->render_type = RT_NONE;				//..just make him disappear
-				ConsoleObject->type = OBJ_GHOST;						//..and kill intersections
+			} else {
+				if (d_rand() < FrameTime*4) {
+					#ifdef NETWORK
+					if (Game_mode & GM_MULTI)
+						multi_send_create_explosion(Player_num);
+					#endif
+					create_small_fireball_on_object(ConsoleObject, F1_0, 1);
+				}
 			}
-		} else {
-			if (d_rand() < FrameTime*4) {
-				#ifdef NETWORK
-				if (Game_mode & GM_MULTI)
-					multi_send_create_explosion(Player_num);
-				#endif
-				create_small_fireball_on_object(ConsoleObject, F1_0, 1);
-			}
-		}
+	
 
 
 		if (Death_sequence_aborted)
@@ -1518,7 +1532,7 @@ void start_player_death_sequence(object *player)
 	Death_sequence_aborted = 0;
 
 	#ifdef NETWORK
-	if (Game_mode & GM_MULTI) 
+	if ((Game_mode & GM_MULTI) && (!(Players[Player_num].spec_flags & PLAYER_FLAGS_SPECTATING))) 
 	{
 		multi_send_kill(Players[Player_num].objnum);
 	}

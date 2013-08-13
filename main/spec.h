@@ -6,7 +6,10 @@
 #define display_spec_text 1
 
 #define SPEC_SPEED_MOD	1
+#define	UNSPEC_TIME	(F1_0*3)
 
+
+ubyte Player_is_unspectating;
 int spec_trigger;
 int in_free;
 int piggy_num;

@@ -271,7 +271,8 @@ void init_player_stats_game(ubyte pnum)
 
 	Players[pnum].spec_flags &= ~PLAYER_FLAGS_SPECTATING;	// jinx 02-01-13 spec
 	Players[pnum].spec_flags &= ~PLAYER_FLAGS_SPECTATING_ME;
-	if (spec) in_free = 1;
+	in_free = 1;
+	Player_is_unspectating = 0;	// jinx 08-13-13 spec
 	
 	init_player_stats_new_ship(pnum);
 
@@ -300,6 +301,8 @@ void init_player_stats_level()
 {
 	// int	i;
 
+	Player_is_unspectating = 0;	// jinx 08-13-13 spec
+	
 	Players[Player_num].last_score = Players[Player_num].score;
 
 	Players[Player_num].level = Current_level_num;
@@ -365,6 +368,7 @@ void init_player_stats_new_ship(ubyte pnum)
 		Player_exploded = 0;
 		Player_eggs_dropped = 0;
 		Dead_player_camera = 0;
+		Player_is_unspectating = 0;	// jinx 08-13-13 spec
 	}
 
 	Players[pnum].energy = MAX_ENERGY;
@@ -1036,19 +1040,22 @@ void DoPlayerDead()
 	}
 	#endif
 
-	#ifdef NETWORK
-	if ( Game_mode&GM_MULTI )
+	if (!Player_is_unspectating)
 	{
-		multi_do_death(Players[Player_num].objnum);
-	}
-	else
-	#endif
-	{				//Note link to above else!
-		Players[Player_num].lives--;
-		if (Players[Player_num].lives == 0)
+		#ifdef NETWORK
+		if ( Game_mode&GM_MULTI )
 		{
-			DoGameOver();
-			return;
+			multi_do_death(Players[Player_num].objnum);
+		}
+		else
+		#endif
+		{				//Note link to above else!
+			Players[Player_num].lives--;
+			if (Players[Player_num].lives == 0)
+			{
+				DoGameOver();
+				return;
+			}
 		}
 	}
 
@@ -1109,6 +1116,8 @@ void DoPlayerDead()
 	if (Game_wind)
 		window_set_visible(Game_wind, 1);
 	reset_time();
+	
+	Player_is_unspectating = 0;
 }
 
 //called when the player is starting a new level for normal game mode and restore state
